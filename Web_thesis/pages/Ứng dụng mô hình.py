@@ -519,20 +519,13 @@ if st.button("Dự đoán nguy cơ"):
     # =========================
     # INTERPRETATION SECTION
     # =========================
-    st.markdown("### 📌 Nhận định mô hình")
+    st.markdown("###  Nhận định mô hình")
 
     interpretation = f"""
     <div class='card'>
 
     <p>Mô hình Random Forest ước tính xác suất doanh nghiệp rơi vào tình trạng 
     <b>kiệt quệ tài chính trong năm tới</b> là <b>{prob:.3f}</b>.</p>
-
-    <p>Theo ngưỡng phân loại:</p>
-    <ul>
-        <li>< 0.30 → Rủi ro thấp</li>
-        <li>0.30 – 0.60 → Cảnh báo trung bình</li>
-        <li>> 0.60 → Nguy cơ cao</li>
-    </ul>
 
     <p>Với mức xác suất hiện tại, doanh nghiệp thuộc nhóm 
     <b>{"rủi ro thấp" if prob < 0.3 else "rủi ro trung bình" if prob < 0.6 else "rủi ro cao"}</b>.</p>
