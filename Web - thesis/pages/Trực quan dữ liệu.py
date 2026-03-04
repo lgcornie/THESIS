@@ -1,0 +1,366 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from pathlib import Path
+
+
+st.set_page_config(layout="wide")
+
+# =========================
+# 🎨 MODERN UI STYLE
+# =========================
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(120deg, #eef2ff 0%, #f8fafc 100%);
+    color: #0f172a;
+}
+header {visibility: hidden;}
+[data-testid="stHeader"] {display: none;}
+.block-container {padding-top: 0rem;}
+
+[data-testid="stSidebar"] {background: #0f172a;}
+[data-testid="stSidebar"] * {color: white !important;}
+
+.card {
+    background: rgba(255,255,255,0.92);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    margin-bottom: 25px;
+}
+
+.hero-title {font-size: 42px;font-weight: 800;text-align: center;}
+.hero-sub {text-align: center;color: #334155;}
+
+.stButton button {
+    color: white !important;
+    background: linear-gradient(90deg,#6366f1,#4f46e5);
+    font-weight: 700;
+    border-radius: 10px;
+}
+label, .stSelectbox label, .stTextInput label {
+    color: #111 !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+}
+
+.stSelectbox div, .stTextInput div {
+    color: #111 !important;
+}
+.alert-box {
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.alert-red {
+    background-color: #ffe5e5;
+    color: #c62828;
+    border-left: 6px solid #ef5350;
+}
+
+.alert-yellow {
+    background-color: #fff8e1;
+    color: #8d6e00;
+    border-left: 6px solid #fbc02d;
+}
+/* text trong select box */
+div[data-baseweb="select"] span {
+    color: #FFFFFF !important;
+    font-weight: 600;
+}
+
+/* vùng hiển thị giá trị */
+div[data-baseweb="select"] > div {
+    color: #FFFFFF !important;
+}
+
+/* placeholder text */
+div[data-baseweb="select"] input {
+    color: #FFFFFF !important;
+}
+
+/* icon dropdown */
+div[data-baseweb="select"] svg {
+    fill: #FFFFFF !important;
+}
+/* ===== SELECT BOX ===== */
+
+/* nền select */
+div[data-baseweb="select"] > div {
+    background-color: #1e293b !important;
+    border-radius: 12px !important;
+}
+
+/* chữ giá trị đã chọn (AAV, 2024) */
+div[data-baseweb="select"] div {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* chữ trong dropdown menu */
+ul[role="listbox"] li {
+    color: #111 !important;
+}
+
+/* icon dropdown */
+div[data-baseweb="select"] svg {
+    fill: #ffffff !important;
+}
+
+/* placeholder */
+div[data-baseweb="select"] input {
+    color: #ffffff !important;
+}
+
+/* fix opacity mờ */
+div[data-baseweb="select"] * {
+    opacity: 1 !important;
+}
+
+
+.safe {color:#059669;font-weight:700;}
+.warn {color:#d97706;font-weight:700;}
+.danger {color:#dc2626;font-weight:700;}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data
+@st.cache_data
+def load_data():
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    data_path = BASE_DIR / "data" / "financial_distress_data.xlsx"
+
+    df = pd.read_excel(data_path)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+df = load_data()
+df["year"] = df["date"].dt.year
+
+# =========================
+# SESSION CONTROL
+# =========================
+if "show_search" not in st.session_state:
+    st.session_state.show_search = False
+
+# =========================
+# DASHBOARD
+# =========================
+if not st.session_state.show_search:
+
+    st.markdown("<br><div class='hero-title'>ĐÁNH GIÁ RỦI RO TÀI CHÍNH</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-sub'>Phân tích nguy cơ kiệt quệ tài chính doanh nghiệp</div><br>", unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
+    col1.markdown(f"<div class='card'><b>Số doanh nghiệp</b><h2>{df['ticker'].nunique()}</h2></div>", unsafe_allow_html=True)
+    col2.markdown(f"<div class='card'><b>Số năm dữ liệu</b><h2>{df['year'].nunique()}</h2></div>", unsafe_allow_html=True)
+    col3.markdown(f"<div class='card'><b>Số quan sát</b><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
+
+    st.markdown("### Bản đồ vốn hóa & rủi ro thị trường")
+
+    tree_df = df.dropna(subset=["market_capitalization","risk_score"])
+    selected_year = st.slider("Chọn năm",
+        int(tree_df.year.min()),
+        int(tree_df.year.max()),
+        int(tree_df.year.max())
+    )
+
+    year_df = tree_df[tree_df.year == selected_year]
+
+    fig_market = px.treemap(
+        year_df,
+        path=[px.Constant("Thị trường"),"ticker"],
+        values="market_capitalization",
+        color="risk_score",
+        color_continuous_scale="RdYlGn_r"
+    )
+
+    st.plotly_chart(fig_market, use_container_width=True)
+
+    st.markdown("### Top 10 Doanh nghiệp rủi ro cao & thấp nhất")
+
+    top_df = year_df.dropna(subset=["risk_score"])
+    col1,col2 = st.columns(2)
+
+    col1.plotly_chart(
+        px.bar(top_df.sort_values("risk_score",ascending=False).head(10),
+        x="risk_score",y="ticker",orientation="h",color="risk_score",
+        color_continuous_scale="Reds"),
+        use_container_width=True)
+
+    col2.plotly_chart(
+        px.bar(top_df.sort_values("risk_score").head(10),
+        x="risk_score",y="ticker",orientation="h",color="risk_score",
+        color_continuous_scale="Greens"),
+        use_container_width=True)
+
+    if st.button("Tra cứu doanh nghiệp"):
+        st.session_state.show_search=True
+        st.rerun()
+
+# =========================
+# SEARCH PAGE
+# =========================
+else:
+
+    if st.button("⬅ Quay lại"):
+        st.session_state.show_search=False
+        st.rerun()
+
+    st.markdown("### Tra cứu doanh nghiệp")
+
+    ticker = st.selectbox("Mã cổ phiếu", sorted(df.ticker.unique()))
+    year = st.selectbox("Năm", sorted(df.year.unique(), reverse=True))
+
+    if not st.button("Phân tích"):
+        st.stop()
+
+    company = df[(df.ticker==ticker)&(df.year==year)]
+    if company.empty:
+        st.warning("Không có dữ liệu.")
+        st.stop()
+
+    info = company.iloc[0]
+
+    history = df[df.ticker==ticker].sort_values("date")
+
+    zone = info["risk_zone"]
+    cls,text = ("safe","AN TOÀN") if "Safe" in zone or "Green" in zone else ("warn","CẢNH BÁO") if "Grey" in zone else ("danger","NGUY HIỂM")
+
+    st.markdown(f"""
+    <div class='card'>
+    <b>Mã CK:</b> {info['ticker']} &nbsp;&nbsp;
+    <b>Doanh nghiệp:</b> {info['company_common_name']}<br><br>
+    <b>Sàn:</b> {info['exchange']} &nbsp;&nbsp;
+    <b>Năm:</b> {year}<br><br>
+    <b>Trạng thái:</b> <span class='{cls}'>{text}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    score = round(info["risk_score"],3)
+    color = "#059669" if score<0.3 else "#d97706" if score<0.6 else "#dc2626"
+
+    c1,c2 = st.columns(2)
+    c1.markdown(f"<div class='card'><b>Risk Score</b><h2 style='color:{color}'>{score}</h2></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='card'><b>Risk Zone</b><h2 style='color:{color}'>{info['risk_zone']}</h2></div>", unsafe_allow_html=True)
+
+    # ===== TABLE =====
+    st.markdown("### Chỉ số tài chính")
+    financial_cols=["total_assets","total_liabilities","net_income_after_tax","roa","roe","current_ratio","quick_ratio","de_ratio"]
+    cols=[c for c in financial_cols if c in history.columns]
+    st.dataframe(history[["date"]+cols], use_container_width=True)
+
+    # ===== RISK TREND =====
+    st.markdown("### Diễn biến Risk Score")
+    st.line_chart(history.set_index("date")["risk_score"])
+
+    latest = history.iloc[-1]
+
+    # ===== STRUCTURE =====
+    st.markdown("### Cấu trúc tài chính")
+    st.plotly_chart(px.bar(history,x="date",y=["total_assets","total_liabilities"],barmode="group"),use_container_width=True)
+
+    # ===== LIQUIDITY =====
+    st.markdown("### Khả năng thanh khoản")
+    st.plotly_chart(px.line(history,x="date",y=["current_ratio","quick_ratio"],markers=True),use_container_width=True)
+
+    # ===== PROFITABILITY =====
+    st.markdown("### Hiệu quả sinh lời")
+    st.plotly_chart(px.line(history,x="date",y=["roa","roe"],markers=True),use_container_width=True)
+
+    # ===== SO SÁNH =====
+    st.markdown("### So sánh Risk với thị trường")
+    market_avg=df[df.year==year]["risk_score"].mean()
+    compare=pd.DataFrame({"Category":["Doanh nghiệp","Trung bình thị trường"],"Risk Score":[score,market_avg]})
+    st.plotly_chart(px.bar(compare,x="Category",y="Risk Score",text="Risk Score"),use_container_width=True)
+
+    # ===== CẢNH BÁO =====
+    if latest.de_ratio>2: st.markdown('<div class="alert-box alert-red">Đòn bẩy tài chính rất cao</div>', unsafe_allow_html=True)
+    if latest.current_ratio<1: st.markdown('<div class="alert-box alert-red">Thanh khoản thấp</div>', unsafe_allow_html=True)
+    if latest.roa<0: st.markdown('<div class="alert-box alert-red">Doanh nghiệp đang thua lỗ</div>', unsafe_allow_html=True)
+
+    # ===== RECOMMEND (LOGICALLY CORRECT VERSION) =====
+    st.markdown("### Nhận định đầu tư")
+
+    # ===== LẤY DUY NHẤT 1 NGUỒN DỮ LIỆU =====
+    current_score = float(latest.risk_score)
+    market_avg = float(df[df.year == year]["risk_score"].mean())
+    company_avg = float(history.risk_score.mean())
+
+    leverage = latest.de_ratio
+    liquidity = latest.current_ratio
+    profitability = latest.roa
+
+    # ===== PHÂN LOẠI =====
+    if current_score >= 0.6:
+        recommendation = "KHÔNG NÊN ĐẦU TƯ"
+        cls = "danger"
+    elif current_score >= 0.3:
+        recommendation = "CÂN NHẮC THẬN TRỌNG"
+        cls = "warn"
+    else:
+        recommendation = "CÓ THỂ XEM XÉT ĐẦU TƯ"
+        cls = "safe"
+
+    # ===== PHÂN TÍCH CHÍNH =====
+    analysis_text = f"""
+    <p>Năm {year}, doanh nghiệp có <b>Risk Score = {current_score:.3f}</b>.</p>
+
+    <p>So với trung bình thị trường ({market_avg:.3f}),
+    mức rủi ro hiện tại <b>{"cao hơn" if current_score > market_avg else "thấp hơn"}</b> thị trường.</p>
+
+    <p>So với mức trung bình lịch sử của chính doanh nghiệp ({company_avg:.3f}),
+    rủi ro hiện tại <b>{"đang gia tăng" if current_score > company_avg else "đang cải thiện"}</b>.</p>
+
+    <p><i>Lưu ý: Risk Score năm {year} được tính từ các chỉ số tài chính của năm {year}
+    và phản ánh xác suất rủi ro tài chính cho năm {year + 1}.</i></p>
+    """
+
+    # ===== PHÂN TÍCH BỔ SUNG =====
+    financial_text = "<ul>"
+
+    if leverage > 2:
+        financial_text += "<li>Đòn bẩy tài chính cao (DE Ratio > 2), áp lực nợ lớn.</li>"
+
+    if liquidity < 1:
+        financial_text += "<li>Thanh khoản yếu (Current Ratio < 1), rủi ro thanh toán ngắn hạn.</li>"
+
+    if profitability < 0:
+        financial_text += "<li>Doanh nghiệp đang ghi nhận lợi nhuận âm (ROA < 0).</li>"
+
+    if financial_text == "<ul>":
+        financial_text += "<li>Các chỉ số tài chính ở mức tương đối an toàn.</li>"
+
+    financial_text += "</ul>"
+
+    # ===== KẾT LUẬN =====
+    conclusion_text = f"""
+    <p>Với Risk Score ở mức {current_score:.3f},
+    doanh nghiệp thuộc nhóm rủi ro 
+    <b>{"cao" if current_score >= 0.6 else "trung bình" if current_score >= 0.3 else "thấp"}</b>.</p>
+
+    <p>Nhà đầu tư nên {"hạn chế giải ngân và ưu tiên bảo toàn vốn"
+    if current_score >= 0.6 else
+    "theo dõi sát diễn biến tài chính trong kỳ tới"
+    if current_score >= 0.3 else
+    "có thể xem xét đầu tư với mức phân bổ hợp lý"}.</p>
+    """
+
+    # ===== HIỂN THỊ =====
+    st.markdown(f"""
+    <div class='card'>
+    <h3 class='{cls}'>{recommendation}</h3>
+    {analysis_text}
+    <b>Phân tích tài chính bổ sung:</b>
+    {financial_text}
+    <b>Kết luận:</b>
+    {conclusion_text}
+    </div>
+    """, unsafe_allow_html=True)
