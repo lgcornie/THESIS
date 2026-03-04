@@ -1,13 +1,10 @@
 streamlit
 pandas
 numpy
-matplotlib
-plotly
 scikit-learn
-pyarrow
+xgboost
+matplotlib
+openpyxl
 joblib
-seaborn
-yfinance
-requests
 shap
-transformers
+plotly
